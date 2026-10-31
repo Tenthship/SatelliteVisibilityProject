@@ -189,16 +189,7 @@ time_list = [t.utc_datetime() for t in times]
 
 
 def create_figure():
-    time_now = ts.now()
-    topocentric = (satellite - observer).at(time_now)
-    alt, az, distance = topocentric.altaz()
-    print(alt.degrees)
-    print(az.degrees)
     fig, ax = plt.subplots()
-    r = (90 - alt.degrees) / 90
-    theta = math.radians(az.degrees)
-    x = r * math.sin(theta)
-    y = r * math.cos(theta)
 
     north = 1
     east = 1
@@ -210,30 +201,68 @@ def create_figure():
     inner_altitude_ring1_radius = 0.667
     inner_altitude_ring2_radius = 0.333
 
-    outer_horizon = patches.Circle(center, outer_horizon_radius, facecolor="none", edgecolor='white')
-    inner_altitude_ring1 = patches.Circle(center, inner_altitude_ring1_radius, facecolor="none", edgecolor='white')
-    inner_altitude_ring2 = patches.Circle(center, inner_altitude_ring2_radius, facecolor="none", edgecolor='white')
+    outer_horizon = patches.Circle(center, outer_horizon_radius, facecolor="none", edgecolor="white")
+    inner_altitude_ring1 = patches.Circle(center, inner_altitude_ring1_radius, facecolor="none", edgecolor="white")
+    inner_altitude_ring2 = patches.Circle(center, inner_altitude_ring2_radius, facecolor="none", edgecolor="white")
 
     ax.add_patch(outer_horizon)
     ax.add_patch(inner_altitude_ring1)
     ax.add_patch(inner_altitude_ring2)
 
-    ax.set_xlim(west -.2, east +.2)
-    ax.set_ylim(south -.2, north +.2)
-    ax.plot([x for x in range(west, east + 1)], [y*0 for y in range(south, north + 1)], color="green")
-    ax.plot([x*0 for x in range(west, east + 1)], [y for y in range(south, north + 1)], color="green")
-    ax.text(0, north + 0.05, "N", color="white")
-    ax.text(east + 0.05, 0, "E", color="white")
-    ax.text(0, south - 0.1, "S", color="white")
-    ax.text(west -0.1, 0, "W", color="white")
+    ax.set_xlim(west - .2, east + .2)
+    ax.set_ylim(south - .2, north + .2)
+    ax.plot([-1, 1], [0, 0], color="green")
+    ax.plot([0, 0], [-1, 1], color="green")
+    ax.text(0, north + 0.05, "N", color="white", ha="center")
+    ax.text(east + 0.05, 0, "E", color="white", va="center")
+    ax.text(0, south - 0.1, "S", color="white", ha="center")
+    ax.text(west - 0.1, 0, "W", color="white", va="center")
 
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_facecolor("black")
-    ax.set_aspect('equal')
-    ax.set_title('Matplotlib Circle Patch')
+    ax.set_aspect("equal")
+    ax.set_title("Live Sky Dome", color="white")
 
-    ax.scatter(x, y)
+    # ---- CREATE ALL SATELLITE OBJECTS ----
+    satellites = [
+        EarthSatellite(d["tle_1"], d["tle_2"], d["name"], ts)
+        for d in data
+    ]
+
+    # ---- ONE scatter object for ALL sats ----
+    dots = ax.scatter(
+        [float("nan")] * len(satellites),
+        [float("nan")] * len(satellites),
+        s=15,
+        color="yellow"
+    )
+
+    def update(frame):
+        t_now = ts.now()
+        offsets = []
+
+        for sat in satellites:
+            topocentric = (sat - observer).at(t_now)
+            alt, az, distance = topocentric.altaz()
+            visible_count = 0
+
+            if alt.degrees >= -60:
+                r = (90 - alt.degrees) / 90
+                theta = math.radians(az.degrees)
+                x = r * math.sin(theta)
+                y = r * math.cos(theta)
+                offsets.append([x, y])
+                visible_count += 1
+            else:
+                offsets.append([float("nan"), float("nan")])
+            
+            print("Visible sats:", visible_count)
+
+        dots.set_offsets(offsets)
+        return dots,
+    
+    ani = FuncAnimation(fig, update, interval=1000, blit=False)
 
     plt.show()
 
